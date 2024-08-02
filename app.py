@@ -6,12 +6,24 @@ from ldap3.core.exceptions import LDAPBindError, LDAPConstraintViolationResult, 
   LDAPSocketOpenError, LDAPExceptionError
 from ldap3 import ALL_ATTRIBUTES, MODIFY_REPLACE, NTLM, ALL_OPERATIONAL_ATTRIBUTES
 import json
+from pathlib import Path
+import shutil
+import yaml
 
-LDAP_SERVER = "192.168.7.110"
-LDAP_PORT = 389 
-LDAP_BASE = "cn=Users,dc=futurelab,dc=intranet"
-LDAP_SEARCH = "sAMAccountName={uid}"
-AD_DOMAIN = "futurelab.intranet"
+
+def read_config():
+  with open('config.yaml') as f:
+    return yaml.safe_load(f)
+
+config = read_config()  
+
+LDAP_SERVER = config["LDAP_SERVER"]
+LDAP_PORT = config["LDAP_PORT"]
+LDAP_BASE = config["LDAP_BASE"]
+LDAP_SEARCH = config["LDAP_SEARCH"]
+LDAP_ADMIN= config["LDAP_ADMIN"]
+LDAP_ADMIN_PWD= config["LDAP_ADMIN_PWD"]
+AD_DOMAIN = config["AD_DOMAIN"]
 OBJECT_CLASS = ['top', 'person', 'organizationalPerson', 'user']
 
 
@@ -55,13 +67,13 @@ def authenticate(username, passwd):
     return False
   
 
-def change_password_ad(username, old_pass, new_pass, local=True):
+def change_password(username, old_pwd, new_pwd, local=True):
   user = format_username(username)
   try:
-    with connect_ldap(authentication=SIMPLE, user=user, password=old_pass) as conn:
+    with connect_ldap(authentication=SIMPLE, user=user, password=old_pwd) as conn:
       conn.bind()
       user_dn = find_user_dn(conn, username)
-      conn.extend.microsoft.modify_password(user_dn, new_pass, old_pass)
+      conn.extend.microsoft.modify_password(user_dn, new_pwd, old_pwd)
   except (LDAPBindError, LDAPInvalidCredentialsResult, LDAPUserNameIsMandatoryError):
     raise Exception('Username or password is incorrect!')
 
@@ -76,10 +88,10 @@ def change_password_ad(username, old_pass, new_pass, local=True):
   except LDAPExceptionError as e:
     raise Exception('Encountered an unexpected danger while communicating with the remote server {}'.format(repr(e)))
     
-def create_user_ad(username, new_password):
+def create_user(username, new_password):
   try:
-    bind_user =  format_username('Administrator')
-    with connect_ldap(ssl=True, authentication=SIMPLE, user=bind_user, password='FuTuR3L@b', auto_bind=True) as conn:
+    bind_user =  format_username(LDAP_ADMIN)
+    with connect_ldap(ssl=True, authentication=SIMPLE, user=bind_user, password=LDAP_ADMIN_PWD, auto_bind=True) as conn:
       attributes = get_attributes(username)
       user_dn = get_dn(username)
       result = conn.add(dn=user_dn, object_class=OBJECT_CLASS, attributes=attributes)
@@ -110,9 +122,9 @@ def create_user_ad(username, new_password):
 
 def search_users(user=None):
   try:
-    bind_user =  format_username('Administrator')
+    bind_user =  format_username(LDAP_ADMIN)
     _filter = "(objectclass=person)" if user is None else "(sAMAccountName={})".format(user)
-    with connect_ldap(ssl=True, authentication=SIMPLE, user=bind_user, password='FuTuR3L@b', auto_bind=True) as conn:
+    with connect_ldap(ssl=True, authentication=SIMPLE, user=bind_user, password=LDAP_ADMIN_PWD, auto_bind=True) as conn:
       conn.search(LDAP_BASE, _filter,attributes=[ALL_ATTRIBUTES, ALL_OPERATIONAL_ATTRIBUTES])
       return conn.entries
   except (LDAPBindError, LDAPInvalidCredentialsResult, LDAPUserNameIsMandatoryError) as e:
@@ -144,10 +156,17 @@ def user_dict(entry):
     tmp = { key: ret[key] for key in sorted(ret.keys()) }
     
     return tmp #OrderedDict(tmp)
-    
+  
+def create_home(username):
+  _path = "/home/{}".format(username)
+  p = Path(_path)
+  if not p.exists():
+    p.mkdir(parents=True)
+  shutil.chown(_path, user=username, group="nogroup")
+
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '1234;lkjasdfp9812u34alskdjfh1p92y54alskjdfhp192854;lkajdsr01923'
+app.config['SECRET_KEY'] = config["SECRET_KEY"]
 
 def check_authentication():
     if not 'user' in session:
@@ -187,7 +206,7 @@ def password(user):
       flash('As novas senhas nao conferem', 'danger')
     else:
       try:
-        change_password_ad(user, old_password, new_password1)
+        change_password(user, old_password, new_password1)
         flash('Alteracao concluida', 'success')
         return redirect(url_for('home', user = user))
       except Exception as e:
@@ -203,9 +222,9 @@ def newuser():
     new_user = request.form['user']
     new_password = request.form['password']
     try:
-      create_user_ad(new_user, new_password)
+      create_user(new_user, new_password)
+      create_home(new_user)
       flash('Criacao concluida', 'success')
-      return redirect(url_for('home', user = user))
     except Exception as e:
       flash(str(e), 'danger')
   return render_template('newuser.html', user = session['user'])
@@ -236,7 +255,7 @@ def details(user):
       
 @app.route('/logout')
 def logout():
-  session.pop('user', None)
+  session.clear()
   flash('Usuario desconectado', 'success')
   return redirect(url_for('login'))
 
