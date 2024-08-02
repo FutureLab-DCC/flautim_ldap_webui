@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+      <div >
+      <ul >		
+        <li class="nav-item">
+          <a class="nav-link js-scroll-trigger" href="{{url_for('details', user=user)}}">Meus dados</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link js-scroll-trigger" href="{{url_for('password', user=user)}}">Alterar Senha</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link js-scroll-trigger" href="{{url_for('list')}}">Lista de Usuarios</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link js-scroll-trigger" href="{{url_for('newuser', user=user)}}">Criar Usuario</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link js-scroll-trigger" href="{{url_for('logout')}}">Sair</a>
+        </li>
+      </ul>
+    </div>
+  
+  <div class="container-fluid p-0">
+	  {% block maincontent %} {% endblock %}
+  </div>
+
+{% endblock %}

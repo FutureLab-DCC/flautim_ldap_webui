@@ -1,0 +1,23 @@
+{% extends 'base-internal.html' %}
+
+{% block maincontent %}
+<form method="post">
+	
+	
+    <div class="form-group">
+		<label for="user">Novo usuario</label>
+        <input type="text" name="user" placeholder="user" class="form-control"  value="{{ request.form['user'] }}"></input>
+    </div>
+
+    <div class="form-group">
+        <label for="password">Senha do novo usuario</label>
+        <input type="password" name="password" placeholder="password" class="form-control"  value="{{ request.form['password'] }}"></input>
+    </div>
+    
+    
+    <div class="form-group">
+        <button type="submit" class="btn btn-primary">Criar</button>
+        <a class="btn btn-primary" href="{{url_for('home', user=user)}}" role="button">Voltar</a>
+    </div>
+</form>
+{% endblock %}

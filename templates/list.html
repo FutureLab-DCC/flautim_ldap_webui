@@ -1,0 +1,17 @@
+{% extends 'base-internal.html' %}
+
+{% block maincontent %}
+
+<table>	
+	{% for entry in entries %}
+	<tr>
+		<td>{{entry['sAMAccountName']}}</td>
+		<td><a href="{{url_for('details', user=entry['sAMAccountName'])}}" class="btn btn-primary btn-lg" role="button">Visualizar Dados</a></td>
+		<td><a href="{{url_for('password', user=entry['sAMAccountName'])}}" class="btn btn-primary btn-lg" role="button">Alterar Senha</a></td>
+	</tr>
+  {% endfor %}
+</table>
+
+<a class="btn btn-primary" href="{{url_for('home', user=user)}}" role="button">Voltar</a>
+
+{% endblock %}

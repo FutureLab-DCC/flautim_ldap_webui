@@ -1,0 +1,28 @@
+{% extends 'base-internal.html' %}
+
+{% block maincontent %}
+
+
+	{% if entry is none %}
+		<b>Usuario nao existe.</b>
+	{% else %}
+	<b>Detalhes do usuario{{user}}</b>
+		<table >		
+	  <thead>
+		<tr>
+		  <th scope="col">Atributo</th>
+		  <th scope="col">Valor</th>
+		</tr>
+	  </thead>
+  <tbody>
+		{% for key in entry.keys() %}
+		  <tr>
+			<td><b>{{key}}</b></td> <td>{{entry[key]}}</td>
+		  </tr>
+	    {% endfor %}
+	    </table>
+	{% endif %}
+
+<a class="btn btn-primary" href="{{url_for('home', user=session['user'])}}" role="button">Voltar</a>
+
+{% endblock %}
