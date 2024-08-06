@@ -24,6 +24,7 @@ LDAP_SEARCH = config["LDAP_SEARCH"]
 LDAP_ADMIN= config["LDAP_ADMIN"]
 LDAP_ADMIN_PWD= config["LDAP_ADMIN_PWD"]
 AD_DOMAIN = config["AD_DOMAIN"]
+ADMINS = config["ADMINS"]
 OBJECT_CLASS = ['top', 'person', 'organizationalPerson', 'user']
 
 
@@ -191,7 +192,7 @@ def check_authentication():
 
 
 def check_authorization():
-    if not 'admin' in session:
+    if not session['user'] in ADMINS:
         raise AuthorizationError()
 
 
@@ -213,8 +214,12 @@ def login():
 
 @app.route('/user/<user>')
 def home(user):
-  check_authentication()
-  return render_template('home.html', user = user)
+  try:
+    check_authentication()
+    return render_template('home.html', user = user)
+  except AuthenticationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('login'))
   
 
 @app.route('/mypassword/<user>', methods=('GET', 'POST'))
@@ -231,7 +236,7 @@ def mypassword(user):
         change_password(user, old_password, new_password1)
         flash('Alteracao concluida', 'success')
         return redirect(url_for('home', user = user))
-  except AuthorizationError as e:
+  except AuthenticationError as e:
     flash(str(e), 'danger')
     return redirect(url_for('login'))
   except Exception as e:
@@ -239,10 +244,12 @@ def mypassword(user):
         
   return render_template('password.html', user = user)
 
+
 @app.route('/password/<user>', methods=('GET', 'POST'))
 def password(user):
   try:
     check_authentication()
+    check_authorization()
     if request.method == 'POST':
       new_password1 = request.form['new_password1']
       new_password2 = request.form['new_password2']
@@ -252,9 +259,12 @@ def password(user):
         change_password(user, new_password1, admin=True )
         flash('Alteracao concluida', 'success')
         return redirect(url_for('home', user = user))
-  except AuthorizationError as e:
+  except AuthenticationError as e:
     flash(str(e), 'danger')
     return redirect(url_for('login'))
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('home'))
   except Exception as e:
     flash(str(e), 'danger')
         
@@ -265,15 +275,19 @@ def password(user):
 def newuser():
   try:
     check_authentication()
+    check_authorization()
     if request.method == 'POST':
       new_user = request.form['user']
       new_password = request.form['password']
       create_user(new_user, new_password)
       create_home(new_user)
       flash('Criacao concluida', 'success')
-  except AuthorizationError as e:
+  except AuthenticationError as e:
     flash(str(e), 'danger')
     return redirect(url_for('login'))
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('home'))
   except Exception as e:
     flash(str(e), 'danger')
 
@@ -285,7 +299,7 @@ def list():
   try:
     check_authentication()
     entries = search_users(None)
-  except AuthorizationError as e:
+  except AuthenticationError as e:
     flash(str(e), 'danger')
     return redirect(url_for('login'))
   except Exception as e:
@@ -300,7 +314,7 @@ def details(user):
     check_authentication()
     entries = search_users(user)
     entry = user_dict(entries[0])
-  except AuthorizationError as e:
+  except AuthenticationError as e:
     flash(str(e), 'danger')
     return redirect(url_for('login'))
   except Exception as e:

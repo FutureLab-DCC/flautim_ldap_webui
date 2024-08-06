@@ -6,3 +6,8 @@ AD_DOMAIN: "futurelab.intranet"
 LDAP_ADMIN: "Administrator"
 LDAP_ADMIN_PWD: "#######"
 SECRET_KEY: "#######"
+ADMINS:
+  - petronio.candido
+  - pedro.barros
+  - marceloqao
+  - glauber.santos
