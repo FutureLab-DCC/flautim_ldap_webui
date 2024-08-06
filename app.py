@@ -67,10 +67,15 @@ def authenticate(username, passwd):
     return False
   
 
-def change_password(username, old_pwd, new_pwd, local=True):
-  user = format_username(username)
+def change_password(username, new_pwd, old_pwd=None, admin=True):
+  if admin:
+    bind_user = format_username(LDAP_ADMIN)
+    bind_pw = LDAP_ADMIN_PWD
+  else:
+    bind_user = format_username(username)
+    bind_pw = old_pwd
   try:
-    with connect_ldap(authentication=SIMPLE, user=user, password=old_pwd) as conn:
+    with connect_ldap(authentication=SIMPLE, user=bind_user, password=bind_pw) as conn:
       conn.bind()
       user_dn = find_user_dn(conn, username)
       conn.extend.microsoft.modify_password(user_dn, new_pwd, old_pwd)
@@ -165,13 +170,30 @@ def create_home(username):
   shutil.chown(_path, user=username, group="nogroup")
 
 
+class AuthenticationError(Exception):
+  def __init__(self) -> None:
+    super().__init__(message = "Usuário não autenticado.")
+
+
+class AuthorizationError(Exception):
+  def __init__(self, *args: object) -> None:
+    super().__init__(message = "Usuário não possui acesso à essa página.")
+
+
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config["SECRET_KEY"]
 
+
 def check_authentication():
     if not 'user' in session:
-        flash('Usuario nao conectado!', 'danger')
-        return redirect(url_for('login'))
+        raise AuthenticationError()
+
+
+def check_authorization():
+    if not 'admin' in session:
+        raise AuthorizationError()
+
 
 @app.route('/', methods=('GET', 'POST'))
 def login():
@@ -195,46 +217,77 @@ def home(user):
   return render_template('home.html', user = user)
   
 
-@app.route('/password/<user>', methods=('GET', 'POST'))
-def password(user):
-  check_authentication()
-  if request.method == 'POST':
-    old_password = request.form['old_password']
-    new_password1 = request.form['new_password1']
-    new_password2 = request.form['new_password2']
-    if new_password1 != new_password2:
-      flash('As novas senhas nao conferem', 'danger')
-    else:
-      try:
+@app.route('/mypassword/<user>', methods=('GET', 'POST'))
+def mypassword(user):
+  try:
+    check_authentication()
+    if request.method == 'POST':
+      old_password = request.form['old_password']
+      new_password1 = request.form['new_password1']
+      new_password2 = request.form['new_password2']
+      if new_password1 != new_password2:
+        flash('As novas senhas nao conferem', 'danger')
+      else:
         change_password(user, old_password, new_password1)
         flash('Alteracao concluida', 'success')
         return redirect(url_for('home', user = user))
-      except Exception as e:
-        flash(str(e), 'danger')
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('login'))
+  except Exception as e:
+    flash(str(e), 'danger')
+        
+  return render_template('password.html', user = user)
+
+@app.route('/password/<user>', methods=('GET', 'POST'))
+def password(user):
+  try:
+    check_authentication()
+    if request.method == 'POST':
+      new_password1 = request.form['new_password1']
+      new_password2 = request.form['new_password2']
+      if new_password1 != new_password2:
+        flash('As novas senhas nao conferem', 'danger')
+      else:
+        change_password(user, new_password1, admin=True )
+        flash('Alteracao concluida', 'success')
+        return redirect(url_for('home', user = user))
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('login'))
+  except Exception as e:
+    flash(str(e), 'danger')
         
   return render_template('password.html', user = user)
   
   
 @app.route('/newuser/', methods=('GET', 'POST'))
 def newuser():
-  check_authentication()
-  if request.method == 'POST':
-    new_user = request.form['user']
-    new_password = request.form['password']
-    try:
+  try:
+    check_authentication()
+    if request.method == 'POST':
+      new_user = request.form['user']
+      new_password = request.form['password']
       create_user(new_user, new_password)
       create_home(new_user)
       flash('Criacao concluida', 'success')
-    except Exception as e:
-      flash(str(e), 'danger')
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('login'))
+  except Exception as e:
+    flash(str(e), 'danger')
+
   return render_template('newuser.html', user = session['user'])
 
 
 @app.route('/list/')
 def list():
-  check_authentication()
   try:
+    check_authentication()
     entries = search_users(None)
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('login'))
   except Exception as e:
     flash(str(e), 'danger')
     entries = None
@@ -243,10 +296,13 @@ def list():
 
 @app.route('/details/<user>')
 def details(user):
-  check_authentication()
   try:
+    check_authentication()
     entries = search_users(user)
     entry = user_dict(entries[0])
+  except AuthorizationError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('login'))
   except Exception as e:
     flash(str(e), 'danger')
     entry = None
