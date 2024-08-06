@@ -1,7 +1,15 @@
 {% extends 'base-internal.html' %}
 
 {% block maincontent %}
-
+<form method="post">
+    <div class="form-group">
+		<label for="user">Usuário</label>
+        <input type="text" name="user" placeholder="user" class="form-control"  value="{{ request.form['user'] }}"></input>
+    </div>    
+    <div class="form-group">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+</form>
 <table>	
 	{% for entry in entries %}
 	<tr>
@@ -12,6 +20,6 @@
   {% endfor %}
 </table>
 
-<a class="btn btn-primary" href="{{url_for('home', user=user)}}" role="button">Voltar</a>
+<a class="btn btn-primary" href="{{url_for('home', user=session['user'])}}" role="button">Voltar</a>
 
 {% endblock %}

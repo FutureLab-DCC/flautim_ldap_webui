@@ -294,11 +294,15 @@ def newuser():
   return render_template('newuser.html', user = session['user'])
 
 
-@app.route('/list/')
+@app.route('/list/', methods=('GET', 'POST'))
 def list():
   try:
     check_authentication()
-    entries = search_users(None)
+    if request.method == 'POST':
+      filter = request.form['user']
+    else:
+      filter = None
+    entries = search_users(filter)
   except AuthenticationError as e:
     flash(str(e), 'danger')
     return redirect(url_for('login'))
